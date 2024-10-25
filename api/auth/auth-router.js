@@ -1,7 +1,34 @@
 const router = require('express').Router();
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const db = require('../../data/dbConfig');
+const JWT_SECRET = process.env.JWT_SECRET || 'shh';
 
-router.post('/register', (req, res) => {
-  res.end('implement register, please!');
+router.post('/register', async (req, res, next) => {
+  try {
+    const { username, password } = req.body;
+    const saltRounds = 8;
+
+    if (!username || !password) {
+      return res.status(400).json({ message: "username and password required" });
+    }
+
+    const existingUser = await db('users').where({ username }).first();
+    if (existingUser) {
+      return res.status(409).json({ message: "username taken" });
+    }
+
+    const hashedPassword = bcrypt.hashSync(password, saltRounds);
+
+    const [newUser] = await db('users')
+      .insert({ username, password: hashedPassword })
+      .returning(['id', 'username', 'password']);
+
+    res.status(201).json(newUser);
+  } catch (err) {
+    next(err);
+  }
+
   /*
     IMPLEMENT
     You are welcome to build additional middlewares to help with the endpoint's functionality.
@@ -29,8 +56,33 @@ router.post('/register', (req, res) => {
   */
 });
 
-router.post('/login', (req, res) => {
-  res.end('implement login, please!');
+router.post('/login', async (req, res, next) => {
+  try {
+    const { username, password } = req.body;
+
+    if (!username || !password) {
+      return res.status(400).json({ message: "username and password required" });
+    }
+
+    const user = await db('users').where({ username }).first();
+
+    if (user && bcrypt.compareSync(password, user.password)) {
+      const token = jwt.sign(
+        { userId: user.id, username: user.username },
+        JWT_SECRET,
+        { expiresIn: '1d' }
+      );
+
+      res.status(200).json({
+        message: `welcome, ${user.username}`,
+        token,
+      });
+    } else {
+      res.status(401).json({ message: "invalid credentials" });
+    }
+  } catch (err) {
+    next(err);
+  }
   /*
     IMPLEMENT
     You are welcome to build additional middlewares to help with the endpoint's functionality.
