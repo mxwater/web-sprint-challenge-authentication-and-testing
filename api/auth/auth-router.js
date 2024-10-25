@@ -20,14 +20,16 @@ router.post('/register', async (req, res, next) => {
 
     const hashedPassword = bcrypt.hashSync(password, saltRounds);
 
-    const [newUser] = await db('users')
-      .insert({ username, password: hashedPassword })
-      .returning(['id', 'username', 'password']);
+    const [newUserId] = await db('users')
+      .insert({ username, password: hashedPassword });
 
-    res.status(201).json(newUser);
-  } catch (err) {
-    next(err);
-  }
+      const newUser = await db('users').where({ id: newUserId }).first();
+      res.status(201).json(newUser);
+    } catch (err) {
+      console.log(err); 
+      next(err);
+    }
+
 
   /*
     IMPLEMENT
